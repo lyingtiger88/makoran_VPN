@@ -259,7 +259,7 @@ class MainActivity : Activity() {
                 val ranking = ServerRanking.rank(items)
                 runOnUiThread {
                     output.text = ranking.take(10).joinToString("\n\n") { r ->
-                        "${r.server.name}  •  ${r.latencyMs?.let { \"$it ms\" } ?: \"بدون پاسخ\"}  •  ${r.score}/100"
+                        r.server.name + "  •  " + (r.latencyMs?.toString() ?: "بدون پاسخ") + " ms  •  " + r.score + "/100"
                     }
                 }
             }
