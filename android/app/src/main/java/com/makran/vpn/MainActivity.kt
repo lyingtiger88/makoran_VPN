@@ -3,6 +3,9 @@ package com.makran.vpn
 import android.app.Activity
 import android.os.Bundle
 import android.content.Context
+import android.content.Intent
+import android.net.VpnService
+import android.net.Uri
 import android.content.res.ColorStateList
 import android.graphics.Color
 import android.graphics.Typeface
@@ -32,6 +35,15 @@ class MainActivity : Activity() {
     private var bypassIran = true
     private var quotaBypass = true
     private lateinit var content: LinearLayout
+    private lateinit var wireGuardController: WireGuardController
+    private var pendingWireGuardConfig: String? = null
+    private var gamingConfigInput: EditText? = null
+    private var gamingStatus: TextView? = null
+
+    companion object {
+        private const val REQUEST_VPN_PERMISSION = 7201
+        private const val REQUEST_WIREGUARD_FILE = 7202
+    }
 
     private fun dp(n: Int) = (n * resources.displayMetrics.density + 0.5f).toInt()
     private fun bg(color: Int, radius: Int = 20, border: Int? = null) =
@@ -116,7 +128,32 @@ class MainActivity : Activity() {
         window.statusBarColor = navy
         window.navigationBarColor = Color.WHITE
         window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR
+        wireGuardController = WireGuardController(applicationContext)
         show("home")
+    }
+
+    @Deprecated("Deprecated in Android API; retained for broad device compatibility")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        when (requestCode) {
+            REQUEST_VPN_PERMISSION -> {
+                val config = pendingWireGuardConfig
+                pendingWireGuardConfig = null
+                if (resultCode == RESULT_OK && config != null) connectGaming(config)
+                else gamingStatus?.text = "مجوز VPN داده نشد؛ اتصال برقرار نشد."
+            }
+            REQUEST_WIREGUARD_FILE -> {
+                val uri: Uri = data?.data ?: return
+                try {
+                    val config = contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
+                        ?: throw IllegalStateException("امکان خواندن فایل وجود ندارد.")
+                    gamingConfigInput?.setText(config)
+                    gamingStatus?.text = "فایل کانفیگ بارگذاری شد. برای اتصال، دکمه اتصال را بزنید."
+                } catch (error: Exception) {
+                    gamingStatus?.text = "خواندن فایل ناموفق بود: ${error.message}"
+                }
+            }
+        }
     }
 
     private fun show(page: String) {
@@ -167,6 +204,7 @@ class MainActivity : Activity() {
             "login" -> login()
             "home" -> home()
             "servers" -> servers()
+            "gaming" -> gaming()
             "scan" -> scan()
             "results" -> results()
             "plans" -> plans()
@@ -222,6 +260,7 @@ class MainActivity : Activity() {
         }
         hero.addView(connect, lp(dp(65)))
         content.addView(hero); gap(18)
+        addCard("Gaming VPN با WireGuard", "اتصال با فایل کانفیگ اختصاصی بازی", "🎮") { show("gaming") }
         addCard("سرور انتخابی", selectedServer + "  ←  تغییر سرور", "🌐") { show("servers") }
         addCard("انتخاب هوشمند", "اندازه‌گیری دسترسی TCP به سرورهای واردشده", "⚡") { show("scan") }
         addCard("اشتراک من", "فعلاً هیچ اشتراک تأییدشده‌ای ثبت نشده است.", "✧") { show("plans") }
@@ -266,6 +305,94 @@ class MainActivity : Activity() {
         }
         content.addView(output)
     }
+
+    private fun gaming() {
+        heading("Gaming VPN", "اتصال WireGuard با کانفیگ سرور خودت")
+        addCard("موتور اتصال", "WireGuard رسمی • تونل رمزنگاری‌شده Android", "🎮")
+        note("برای اتصال، باید فایل .conf معتبر از سرور WireGuard داشته باشی. هیچ سرور آزمایشی یا کلید ساختگی داخل برنامه قرار نداده‌ام.")
+        val input = EditText(this).apply {
+            hint = "[Interface]\\nPrivateKey = ...\\nAddress = ...\\nDNS = ...\\n\\n[Peer]\\nPublicKey = ...\\nEndpoint = host:51820\\nAllowedIPs = 0.0.0.0/0, ::/0"
+            minLines = 9
+            maxLines = 16
+            gravity = Gravity.TOP
+            setSingleLine(false)
+            textDirection = View.TEXT_DIRECTION_LTR
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
+            background = bg(Color.WHITE)
+            setPadding(dp(14), dp(14), dp(14), dp(14))
+        }
+        gamingConfigInput = input
+        content.addView(input, lp())
+        gap(12)
+        button("انتخاب فایل کانفیگ WireGuard") {
+            val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+                addCategory(Intent.CATEGORY_OPENABLE)
+                type = "text/plain"
+            }
+            startActivityForResult(intent, REQUEST_WIREGUARD_FILE)
+        }
+        val status = text("وضعیت: قطع اتصال", 14f, muted)
+        gamingStatus = status
+        content.addView(status)
+        gap(12)
+        button("اتصال به سرور گیمینگ") {
+            val config = input.text.toString()
+            if (config.isBlank()) {
+                status.text = "ابتدا فایل کانفیگ WireGuard را وارد کن."
+            } else {
+                try {
+                    val permissionIntent = VpnService.prepare(this)
+                    if (permissionIntent != null) {
+                        pendingWireGuardConfig = config
+                        startActivityForResult(permissionIntent, REQUEST_VPN_PERMISSION)
+                    } else {
+                        connectGaming(config)
+                    }
+                } catch (error: Exception) {
+                    status.text = "خطا در آماده‌سازی VPN: ${error.message}"
+                }
+            }
+        }
+        button("قطع اتصال WireGuard", { disconnectGaming() }, false)
+        note("کلید خصوصی فقط برای اجرای اتصال در حافظه برنامه استفاده می‌شود؛ در تنظیمات یا گزارش‌ها ذخیره نمی‌شود. تا وقتی تونل فعال است، VPN دیگری را هم‌زمان روشن نکن.")
+        note("پینگ، جیتر و Packet Loss بازی هنوز اندازه‌گیری نمی‌شوند؛ برای این کار به سرورهای گیمینگ و مقصدهای واقعی نیاز است.")
+    }
+
+    private fun connectGaming(config: String) {
+        gamingStatus?.text = "در حال بررسی کانفیگ و راه‌اندازی تونل..."
+        thread {
+            try {
+                wireGuardController.connect(config)
+                runOnUiThread {
+                    gamingStatus?.text = "وضعیت: درخواست اتصال ارسال شد. برقراری Handshake به دسترسی سرور وابسته است."
+                    info("درخواست راه‌اندازی تونل WireGuard انجام شد.")
+                }
+            } catch (error: Exception) {
+                runOnUiThread {
+                    gamingStatus?.text = "اتصال ناموفق: ${error.message}"
+                    info("اتصال WireGuard برقرار نشد.")
+                }
+            }
+        }
+    }
+
+    private fun disconnectGaming() {
+        gamingStatus?.text = "در حال قطع تونل..."
+        thread {
+            try {
+                wireGuardController.disconnect()
+                runOnUiThread {
+                    gamingStatus?.text = "وضعیت: قطع اتصال"
+                    info("تونل WireGuard قطع شد.")
+                }
+            } catch (error: Exception) {
+                runOnUiThread {
+                    gamingStatus?.text = "خطا هنگام قطع اتصال: ${error.message}"
+                }
+            }
+        }
+    }
+
     private fun results() {
         heading("نتایج بررسی", "نتایج واقعی در صفحه انتخاب هوشمند نمایش داده می‌شوند")
         addCard("سنجش کیفیت", "برای اجرای آزمون، کانفیگ وارد کنید", "⚡") { show("scan") }
