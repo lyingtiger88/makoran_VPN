@@ -92,7 +92,7 @@ class MainActivity : Activity() {
         }
         gap(22)
     }
-    private fun button(caption: String, action: () -> Unit, primary: Boolean = true) {
+    private fun button(caption: String, primary: Boolean = true, action: () -> Unit) {
         val b = TextView(this).apply {
             text = caption; textSize = 16f; gravity = Gravity.CENTER
             setTextColor(if (primary) Color.WHITE else blue)
@@ -176,7 +176,7 @@ class MainActivity : Activity() {
         content = vertical()
         content.setPadding(dp(19), dp(23), dp(19), dp(24))
         val scroller = ScrollView(this).apply {
-            clipToPadding = false; fillViewport = true
+            clipToPadding = false; isFillViewport = true
             addView(content)
         }
         root.addView(scroller, LinearLayout.LayoutParams(-1, 0, 1f))
@@ -242,7 +242,7 @@ class MainActivity : Activity() {
         }
         content.addView(password, lp()); gap()
         button("ورود به حساب") { info("ورود واقعی پس از اتصال به SiteBackend فعال می‌شود.") }
-        button("ادامه در حالت مهمان", { show("home") }, false)
+        button("ادامه در حالت مهمان", false) { show("home") }
     }
     private fun home() {
         heading("سلام، خوش آمدید 👋", "وضعیت اتصال و سرور انتخابی")
@@ -353,7 +353,7 @@ class MainActivity : Activity() {
                 }
             }
         }
-        button("قطع اتصال WireGuard", { disconnectGaming() }, false)
+        button("قطع اتصال WireGuard", false) { disconnectGaming() }
         note("کلید خصوصی فقط برای اجرای اتصال در حافظه برنامه استفاده می‌شود؛ در تنظیمات یا گزارش‌ها ذخیره نمی‌شود. تا وقتی تونل فعال است، VPN دیگری را هم‌زمان روشن نکن.")
         note("پینگ، جیتر و Packet Loss بازی هنوز اندازه‌گیری نمی‌شوند؛ برای این کار به سرورهای گیمینگ و مقصدهای واقعی نیاز است.")
     }
@@ -406,7 +406,7 @@ class MainActivity : Activity() {
             Triple("سالانه", "۳۶۵ روز • شرایط قابل تنظیم", "◇")).forEach { (name, description, glyph) ->
             addCard(name, description + "\nقیمت هنوز تنظیم نشده است", glyph) { show("payment") }
         }
-        button("کد فعال‌سازی دارم", { show("activation") }, false)
+        button("کد فعال‌سازی دارم", false) { show("activation") }
     }
     private fun payment() {
         heading("پرداخت اشتراک", "ثبت سفارش و درگاه پرداخت")
