@@ -1,7 +1,17 @@
-# Makran VPN
+# Makoran VPN
 
 Android Kotlin starter and early VPN client implementation.
 
+## Brand identity
+Makoran VPN uses one consistent visual identity across current and future clients:
+- Deep navy base with electric blue and turquoise highlights.
+- A geometric shield and the letter M for privacy and secure connectivity.
+- Balochi-inspired embroidery geometry, Makran's mountain-and-sea landscape, and a small traditional sailing-vessel motif.
+- No platform-specific redesigns; platform exports must preserve the same composition and palette.
+
+The scalable source artwork is `branding/makoran-icon.svg`. Platform integration notes and export guidance are in `branding/README.md`.
+
+## Android
 Open `android/` in Android Studio. Build requires Android SDK and JDK 17.
 
 ## Current implementation
